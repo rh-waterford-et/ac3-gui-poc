@@ -24,14 +24,14 @@ const Sidebar = ({ aladinInstance }) => {
                 Stellar velocity
               </label>
               <label className="checkbox-item">
-                <input type="checkbox" id="map-velocity-dispersion" />
-                <span className="checkmark"></span>
-                Velocity dispersion
-              </label>
-              <label className="checkbox-item">
                 <input type="checkbox" id="map-stellar-velocity-error" />
                 <span className="checkmark"></span>
                 Stellar velocity Error
+              </label>
+              <label className="checkbox-item">
+                <input type="checkbox" id="map-velocity-dispersion" />
+                <span className="checkmark"></span>
+                Velocity dispersion
               </label>
               <label className="checkbox-item">
                 <input type="checkbox" id="map-velocity-dispersion-error" />

@@ -17,26 +17,6 @@ const Gallery = ({ aladinInstance }) => {
           </div>
         </div>
       </div>
-      
-      {/* Image Modal */}
-      <div className="image-modal" id="image-modal">
-        <div className="modal-backdrop" id="modal-backdrop"></div>
-        <div className="modal-content">
-          <div className="modal-header">
-            <h3 className="modal-title" id="modal-title">Image Title</h3>
-            <button className="modal-close" id="modal-close">×</button>
-          </div>
-          <div className="modal-body">
-            <img className="modal-image" id="modal-image" src="" alt="" />
-          </div>
-          <div className="modal-footer">
-            <div className="modal-info" id="modal-info">
-              <span className="modal-object" id="modal-object">Object</span>
-              <span className="modal-type" id="modal-type">Map Type</span>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
@@ -98,6 +78,282 @@ const setupImageModal = () => {
       closeImageModal();
     }
   });
+  
+  // Setup modal dragging
+  setupModalDrag();
+};
+
+/**
+ * Setup modal drag functionality
+ */
+const setupModalDrag = () => {
+  const modalHeader = document.querySelector('.modal-header');
+  const modalContent = document.querySelector('.modal-content');
+  
+  if (!modalHeader || !modalContent) return;
+  
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+  let initialX = 0;
+  let initialY = 0;
+  
+  // Initialize modal position
+  modalContent._currentX = 0;
+  modalContent._currentY = 0;
+  
+  const updateModalPosition = () => {
+    modalContent.style.transform = `translate(${modalContent._currentX}px, ${modalContent._currentY}px)`;
+  };
+  
+  const handleMouseDown = (e) => {
+    // Only allow dragging if clicking on the header (not close button, transparency controls, or nav buttons)
+    if (e.target.closest('.modal-close') || e.target.closest('.transparency-control') || e.target.closest('.modal-nav-buttons')) return;
+    
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    initialX = modalContent._currentX;
+    initialY = modalContent._currentY;
+    
+    modalContent.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    
+    e.preventDefault();
+  };
+  
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    
+    const deltaX = e.clientX - startX;
+    const deltaY = e.clientY - startY;
+    
+    modalContent._currentX = initialX + deltaX;
+    modalContent._currentY = initialY + deltaY;
+    
+    // Keep modal within viewport bounds
+    const rect = modalContent.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Prevent modal from going too far off screen
+    const minX = -rect.width + 100; // Keep at least 100px visible
+    const maxX = viewportWidth - 100;
+    const minY = -rect.height + 100;
+    const maxY = viewportHeight - 100;
+    
+    modalContent._currentX = Math.max(minX, Math.min(maxX, modalContent._currentX));
+    modalContent._currentY = Math.max(minY, Math.min(maxY, modalContent._currentY));
+    
+    updateModalPosition();
+    e.preventDefault();
+  };
+  
+  const handleMouseUp = () => {
+    if (!isDragging) return;
+    
+    isDragging = false;
+    modalContent.classList.remove('dragging');
+    document.body.style.userSelect = '';
+  };
+  
+  // Touch events for mobile
+  const handleTouchStart = (e) => {
+    if (e.target.closest('.modal-close') || e.target.closest('.transparency-control') || e.target.closest('.modal-nav-buttons')) return;
+    
+    const touch = e.touches[0];
+    isDragging = true;
+    startX = touch.clientX;
+    startY = touch.clientY;
+    initialX = modalContent._currentX;
+    initialY = modalContent._currentY;
+    
+    modalContent.classList.add('dragging');
+    
+    e.preventDefault();
+  };
+  
+  const handleTouchMove = (e) => {
+    if (!isDragging) return;
+    
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - startX;
+    const deltaY = touch.clientY - startY;
+    
+    modalContent._currentX = initialX + deltaX;
+    modalContent._currentY = initialY + deltaY;
+    
+    // Keep modal within viewport bounds
+    const rect = modalContent.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    const minX = -rect.width + 100;
+    const maxX = viewportWidth - 100;
+    const minY = -rect.height + 100;
+    const maxY = viewportHeight - 100;
+    
+    modalContent._currentX = Math.max(minX, Math.min(maxX, modalContent._currentX));
+    modalContent._currentY = Math.max(minY, Math.min(maxY, modalContent._currentY));
+    
+    updateModalPosition();
+    e.preventDefault();
+  };
+  
+  const handleTouchEnd = () => {
+    isDragging = false;
+    modalContent.classList.remove('dragging');
+  };
+  
+  // Add event listeners
+  modalHeader.addEventListener('mousedown', handleMouseDown);
+  document.addEventListener('mousemove', handleMouseMove);
+  document.addEventListener('mouseup', handleMouseUp);
+  
+  // Touch events
+  modalHeader.addEventListener('touchstart', handleTouchStart);
+  document.addEventListener('touchmove', handleTouchMove);
+  document.addEventListener('touchend', handleTouchEnd);
+};
+
+/**
+ * Global variables for modal navigation
+ */
+let currentGalleryItems = [];
+let currentImageIndex = -1;
+
+/**
+ * Set up modal navigation functionality
+ */
+const setupModalNavigation = () => {
+  const prevBtn = document.getElementById('modal-prev');
+  const nextBtn = document.getElementById('modal-next');
+  
+  if (prevBtn && nextBtn) {
+    prevBtn.addEventListener('click', navigateToPrevious);
+    nextBtn.addEventListener('click', navigateToNext);
+    
+    // Add keyboard navigation
+    document.addEventListener('keydown', handleModalKeydown);
+  }
+};
+
+/**
+ * Handle keyboard navigation in modal
+ * @param {KeyboardEvent} e - The keyboard event
+ */
+const handleModalKeydown = (e) => {
+  const modal = document.getElementById('image-modal');
+  if (!modal || !modal.classList.contains('active')) return;
+  
+  switch (e.key) {
+    case 'ArrowLeft':
+      e.preventDefault();
+      navigateToPrevious();
+      break;
+    case 'ArrowRight':
+      e.preventDefault();
+      navigateToNext();
+      break;
+    case 'Escape':
+      e.preventDefault();
+      closeImageModal();
+      break;
+  }
+};
+
+/**
+ * Update navigation button states based on current position
+ */
+const updateNavigationButtons = () => {
+  const prevBtn = document.getElementById('modal-prev');
+  const nextBtn = document.getElementById('modal-next');
+  
+  if (prevBtn && nextBtn) {
+    // Enable buttons if we have more than 1 image (cycling mode)
+    const hasMultipleImages = currentGalleryItems.length > 1;
+    prevBtn.disabled = !hasMultipleImages;
+    nextBtn.disabled = !hasMultipleImages;
+  }
+};
+
+/**
+ * Navigate to previous image in gallery (with cycling)
+ */
+const navigateToPrevious = () => {
+  if (currentGalleryItems.length > 1) {
+    currentImageIndex--;
+    if (currentImageIndex < 0) {
+      currentImageIndex = currentGalleryItems.length - 1; // Cycle to last image
+    }
+    const item = currentGalleryItems[currentImageIndex];
+    displayImageFromNavigation(item);
+  }
+};
+
+/**
+ * Navigate to next image in gallery (with cycling)
+ */
+const navigateToNext = () => {
+  if (currentGalleryItems.length > 1) {
+    currentImageIndex++;
+    if (currentImageIndex >= currentGalleryItems.length) {
+      currentImageIndex = 0; // Cycle to first image
+    }
+    const item = currentGalleryItems[currentImageIndex];
+    displayImageFromNavigation(item);
+  }
+};
+
+/**
+ * Display image from navigation (without rebuilding gallery state)
+ */
+const displayImageFromNavigation = (item) => {
+  const modalImage = document.getElementById('modal-image');
+  const modalTitle = document.getElementById('modal-title');
+  const modalObject = document.getElementById('modal-object');
+  const modalBody = document.querySelector('.modal-body');
+  const transparencySlider = document.getElementById('transparency-slider');
+  
+  if (modalImage && modalTitle && modalObject) {
+    // Get image source from the item
+    const img = item.querySelector('.thumbnail-image');
+    if (img) {
+      modalImage.src = img.src;
+      modalImage.alt = img.alt;
+      
+      // Get title and object from the item
+      const label = item.querySelector('.gallery-label');
+      const objectName = item.dataset.objectName || 'Unknown';
+      
+      modalTitle.textContent = label ? label.textContent : 'Unknown Map';
+      modalObject.textContent = objectName;
+      
+      // Reset image transform and interactions
+      modalImage.style.transform = 'translate(0, 0) scale(1)';
+      modalImage._currentZoom = 1;
+      modalImage._currentX = 0;
+      modalImage._currentY = 0;
+      setupImageInteractions(modalImage);
+      
+      // Reset transparency
+      if (transparencySlider && modalBody) {
+        transparencySlider.value = 95;
+        modalBody.style.opacity = 0.95;
+      }
+      
+      // Update navigation buttons
+      updateNavigationButtons();
+      
+      // Update status
+      const statusElement = document.getElementById('current-status');
+      if (statusElement) {
+        statusElement.textContent = `Viewing ${objectName} map: ${modalTitle.textContent} (${currentImageIndex + 1}/${currentGalleryItems.length})`;
+      }
+      
+      console.log(`🔄 Navigated to image ${currentImageIndex + 1}/${currentGalleryItems.length}: ${modalTitle.textContent}`);
+    }
+  }
 };
 
 /**
@@ -105,20 +361,36 @@ const setupImageModal = () => {
  * @param {string} imageSrc - The image source
  * @param {string} title - The image title
  * @param {string} objectName - The object name
+ * @param {HTMLElement} clickedItem - The gallery item that was clicked (optional)
  */
-const openImageModal = (imageSrc, title, objectName) => {
+const openImageModal = (imageSrc, title, objectName, clickedItem = null) => {
   const modal = document.getElementById('image-modal');
   const modalImage = document.getElementById('modal-image');
   const modalTitle = document.getElementById('modal-title');
   const modalObject = document.getElementById('modal-object');
-  const modalType = document.getElementById('modal-type');
+  const modalContent = document.querySelector('.modal-content');
+  const modalBody = document.querySelector('.modal-body');
+  const transparencySlider = document.getElementById('transparency-slider');
   
-  if (modal && modalImage && modalTitle && modalObject && modalType) {
+  if (modal && modalImage && modalTitle && modalObject && modalContent) {
     modalImage.src = imageSrc;
     modalImage.alt = `${title} for ${objectName}`;
     modalTitle.textContent = title;
     modalObject.textContent = objectName;
-    modalType.textContent = title;
+    
+    // Set up navigation state
+    setupNavigationState(clickedItem, imageSrc);
+    
+    // Reset modal position - center horizontally, raise vertically
+    modalContent._currentX = 0;
+    modalContent._currentY = -80; // Raise modal 80px above center
+    modalContent.style.transform = 'translate(0, -80px)';
+    
+    // Reset transparency to default (only affect body)
+    if (transparencySlider && modalBody) {
+      transparencySlider.value = 95;
+      modalBody.style.opacity = 0.95;
+    }
     
     // Reset image position, zoom and set up interactions
     modalImage.style.transform = 'translate(0, 0) scale(1)';
@@ -127,10 +399,48 @@ const openImageModal = (imageSrc, title, objectName) => {
     modalImage._currentY = 0;
     setupImageInteractions(modalImage);
     
+    // Set up navigation if not already done
+    setupModalNavigation();
+    
     modal.classList.add('active');
     document.body.style.overflow = 'hidden'; // Prevent background scrolling
     
-    console.log(`🖼️ Opened modal for ${title} - ${objectName}`);
+    console.log(`🖼️ Opened modal for ${title} - ${objectName} (${currentImageIndex + 1}/${currentGalleryItems.length})`);
+  }
+};
+
+/**
+ * Set up navigation state for modal
+ * @param {HTMLElement} clickedItem - The gallery item that was clicked
+ * @param {string} imageSrc - The image source to match
+ */
+const setupNavigationState = (clickedItem, imageSrc) => {
+  // Get all gallery items that have actual images (not placeholders)
+  const galleryItems = document.getElementById('gallery-items');
+  if (galleryItems) {
+    currentGalleryItems = Array.from(galleryItems.querySelectorAll('.gallery-item')).filter(item => {
+      const img = item.querySelector('.thumbnail-image');
+      return img && img.src && !item.classList.contains('placeholder-item');
+    });
+    
+    // Find the current image index
+    if (clickedItem) {
+      currentImageIndex = currentGalleryItems.indexOf(clickedItem);
+    } else {
+      // Fallback: find by image source
+      currentImageIndex = currentGalleryItems.findIndex(item => {
+        const img = item.querySelector('.thumbnail-image');
+        return img && img.src === imageSrc;
+      });
+    }
+    
+    // Ensure valid index
+    if (currentImageIndex === -1) {
+      currentImageIndex = 0;
+    }
+    
+    // Update navigation buttons
+    updateNavigationButtons();
   }
 };
 
@@ -140,10 +450,24 @@ const openImageModal = (imageSrc, title, objectName) => {
 const closeImageModal = () => {
   const modal = document.getElementById('image-modal');
   const modalImage = document.getElementById('modal-image');
+  const modalContent = document.querySelector('.modal-content');
+  const modalBody = document.querySelector('.modal-body');
   
   if (modal) {
     modal.classList.remove('active');
     document.body.style.overflow = ''; // Restore scrolling
+    
+    // Reset modal position
+    if (modalContent) {
+      modalContent._currentX = 0;
+      modalContent._currentY = -80;
+      modalContent.style.transform = 'translate(0, -80px)';
+    }
+    
+    // Reset modal body opacity
+    if (modalBody) {
+      modalBody.style.opacity = '';
+    }
     
     // Clear image source and reset position/zoom
     if (modalImage) {
@@ -154,6 +478,13 @@ const closeImageModal = () => {
       modalImage._currentY = 0;
       removeInteractionListeners(modalImage);
     }
+    
+    // Clean up navigation state
+    currentGalleryItems = [];
+    currentImageIndex = -1;
+    
+    // Remove keyboard event listener
+    document.removeEventListener('keydown', handleModalKeydown);
     
     console.log('🖼️ Closed modal');
   }
@@ -398,8 +729,8 @@ const loadObjectImages = async (objectName) => {
   // Map types that we expect to find images for
   const mapTypes = [
     { key: 'stellar-velocity', suffix: 'stellar_velocity', label: 'Stellar Velocity', checkboxId: 'map-stellar-velocity' },
-    { key: 'velocity-dispersion', suffix: 'velocity_dispersion', label: 'Velocity Dispersion', checkboxId: 'map-velocity-dispersion' },
     { key: 'stellar-velocity-error', suffix: 'stellar_velocity_error', label: 'Stellar Velocity Error', checkboxId: 'map-stellar-velocity-error' },
+    { key: 'velocity-dispersion', suffix: 'velocity_dispersion', label: 'Velocity Dispersion', checkboxId: 'map-velocity-dispersion' },
     { key: 'velocity-dispersion-error', suffix: 'velocity_dispersion_error', label: 'Velocity Dispersion Error', checkboxId: 'map-velocity-dispersion-error' },
     { key: 'h3', suffix: 'h3', label: 'H3', checkboxId: 'map-h3' },
     { key: 'h4', suffix: 'h4', label: 'H4', checkboxId: 'map-h4' },
@@ -480,8 +811,6 @@ const tryLoadObjectImage = async (imageName, mapType, objectName) => {
      return false;
 };
 
-
-
 /**
  * Add an image to the gallery
  * @param {string} imageSrc - The image source
@@ -508,8 +837,8 @@ const addImageToGallery = (imageSrc, mapType, objectName) => {
   mapItem.addEventListener('click', () => {
     console.log(`Clicked on ${objectName} map: ${mapType.key}`);
     
-    // Open modal with full-size image
-    openImageModal(imageSrc, mapType.label, objectName);
+    // Open modal with full-size image, passing the clicked item
+    openImageModal(imageSrc, mapType.label, objectName, mapItem);
     
     // Update status
     const statusElement = document.getElementById('current-status');

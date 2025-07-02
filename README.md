@@ -176,5 +176,4 @@ The application includes comprehensive console logging:
 ## Acknowledgments
 
 - **Aladin Lite**: Centre de Données astronomiques de Strasbourg (CDS)
-- **AC³ Project**: [Add project acknowledgments]
 - **Astronomical Data**: Various sky surveys and catalogs
